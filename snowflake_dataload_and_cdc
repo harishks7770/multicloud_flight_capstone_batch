@@ -1,0 +1,77 @@
+-- Load existing Parquet data from S3 into the Landing Table
+COPY INTO FLIGHT_RAW_LANDING (
+    ingested_at,
+    icao24,
+    callsign,
+    origin_country,
+    longitude,
+    latitude,
+    altitude_meters,
+    velocity_ms
+)
+FROM (
+    SELECT 
+        $1:ingested_at::TIMESTAMP_NTZ,
+        $1:icao24::VARCHAR,
+        $1:callsign::VARCHAR,
+        $1:origin_country::VARCHAR,
+        $1:longitude::DOUBLE,
+        $1:latitude::DOUBLE,
+        $1:altitude_meters::DOUBLE,
+        $1:velocity_ms::DOUBLE
+    FROM @s3_flight_processed_stage
+)
+ON_ERROR = 'CONTINUE';
+
+-----------------------------------------------------------------------------------
+-- 1. Create a Stream on the Landing Table to capture new batch inserts
+CREATE OR REPLACE STREAM flight_raw_cdc_stream ON TABLE FLIGHT_RAW_LANDING;
+
+-- 2. Create Task to MERGE stream deltas into target table every 10 minutes
+CREATE OR REPLACE TASK process_flight_cdc_task
+  WAREHOUSE = COMPUTE_WH  -- Replace with your Warehouse name
+  SCHEDULE = '10 MINUTE'
+  WHEN SYSTEM$STREAM_HAS_DATA('flight_raw_cdc_stream')
+AS
+  MERGE INTO FLIGHT_ANALYTICS_TARGET AS target
+  USING (
+      SELECT 
+          icao24,
+          callsign,
+          origin_country,
+          longitude,
+          latitude,
+          altitude_meters,
+          velocity_ms,
+          ingested_at
+      FROM flight_raw_cdc_stream
+      WHERE METADATA$ACTION = 'INSERT'
+      -- Qualify latest status per flight transponder in current micro-batch
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY icao24 ORDER BY ingested_at DESC) = 1
+  ) AS src
+  ON target.icao24 = src.icao24
+  
+  -- UPDATE existing aircraft entry if newer telemetry arrives
+  WHEN MATCHED AND src.ingested_at > target.last_updated_at THEN 
+      UPDATE SET 
+          target.callsign = src.callsign,
+          target.origin_country = src.origin_country,
+          target.longitude = src.longitude,
+          target.latitude = src.latitude,
+          target.altitude_meters = src.altitude_meters,
+          target.velocity_ms = src.velocity_ms,
+          target.last_updated_at = src.ingested_at
+
+  -- INSERT new aircraft entry if not currently tracked
+  WHEN NOT MATCHED THEN 
+      INSERT (
+          icao24, callsign, origin_country, longitude, 
+          latitude, altitude_meters, velocity_ms, last_updated_at
+      ) 
+      VALUES (
+          src.icao24, src.callsign, src.origin_country, src.longitude, 
+          src.latitude, src.altitude_meters, src.velocity_ms, src.ingested_at
+      );
+
+-- 3. Resume the Task (Tasks are created in SUSPENDED state by default)
+ALTER TASK process_flight_cdc_task RESUME;
