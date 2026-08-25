@@ -20,3 +20,28 @@ CREATE OR REPLACE STAGE s3_flight_processed_stage
   URL = 's3://capstone1010/processed/flight_delta_table/'
   STORAGE_INTEGRATION = s3_flight_integration
   FILE_FORMAT = parquet_format;
+
+-- 1. Create Operational Landing Table (Stores All Processed Batches)
+CREATE OR REPLACE TABLE FLIGHT_RAW_LANDING (
+    ingested_at TIMESTAMP_NTZ,
+    icao24 VARCHAR(50),
+    callsign VARCHAR(50),
+    origin_country VARCHAR(100),
+    longitude DOUBLE,
+    latitude DOUBLE,
+    altitude_meters DOUBLE,
+    velocity_ms DOUBLE,
+    loaded_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+-- 2. Create Analytical Target Table (Sinks Upserted / CDC Data)
+CREATE OR REPLACE TABLE FLIGHT_ANALYTICS_TARGET (
+    icao24 VARCHAR(50) PRIMARY KEY,
+    callsign VARCHAR(50),
+    origin_country VARCHAR(100),
+    longitude DOUBLE,
+    latitude DOUBLE,
+    altitude_meters DOUBLE,
+    velocity_ms DOUBLE,
+    last_updated_at TIMESTAMP_NTZ
+);
