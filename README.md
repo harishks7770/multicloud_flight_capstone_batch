@@ -40,3 +40,9 @@ A multi-cloud data engineering capstone project that orchestrates real-time glob
 ┌─────────────────────────┐
 │ Snowflake Target Zone   │  --> (FLIGHT_ANALYTICS_TARGET - Real-Time Merge Table)
 └─────────────────────────┘
+
+## 🛠️ Tech Stack
+
+* **Orchestration & Raw Ingestion:** OpenSky Network API ➔ Apache Airflow ➔ AWS S3 (Raw JSON)
+* **Processing Engine:** PySpark ➔ AWS S3 (Delta Lake Storage)
+* **Warehouse & CDC Engine:** Snowflake (Storage Integration ➔ Streams & Tasks)
