@@ -1,0 +1,22 @@
+-- 1. Create Storage Integration (IAM Role-Based Authentication)
+CREATE OR REPLACE STORAGE INTEGRATION s3_flight_integration
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = 'S3'
+  ENABLED = TRUE
+  STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<ROLE_NAME>'
+  STORAGE_ALLOWED_LOCATIONS = ('s3://capstone1010/processed/flight_delta_table/');
+
+-- 2. Execute this DESC command to retrieve 'STORAGE_AWS_IAM_USER_ARN' and 'STORAGE_AWS_EXTERNAL_ID'
+--    Update your AWS IAM Role Trust Policy with these two values!
+DESC INTEGRATION s3_flight_integration;
+
+-- 3. Create Parquet File Format
+CREATE OR REPLACE FILE FORMAT parquet_format
+  TYPE = 'PARQUET'
+  COMPRESSION = 'SNAPPY';
+
+-- 4. Create External Stage pointing to Processed Delta/Parquet Path
+CREATE OR REPLACE STAGE s3_flight_processed_stage
+  URL = 's3://capstone1010/processed/flight_delta_table/'
+  STORAGE_INTEGRATION = s3_flight_integration
+  FILE_FORMAT = parquet_format;
