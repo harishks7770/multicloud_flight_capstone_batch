@@ -1,0 +1,8 @@
+-- View delta records currently waiting in the CDC stream
+SELECT * FROM flight_raw_cdc_stream;
+
+-- Inspect state of automated CDC Task
+SHOW TASKS LIKE 'process_flight_cdc_task';
+
+-- Query final deduplicated CDC target state
+SELECT * FROM FLIGHT_ANALYTICS_TARGET ORDER BY last_updated_at DESC LIMIT 10;
