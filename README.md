@@ -1,48 +1,38 @@
-# ✈️ Multi-Cloud Real-Time Flight Data Pipeline & CDC Analytics Engine
+# ✈️ Multi-Cloud Flight Data Pipeline (Medallion Architecture)
 
-A multi-cloud data engineering capstone project that orchestrates real-time global flight telemetry ingestion from the OpenSky Network API, stores raw JSON payloads in AWS S3, cleans and standardizes nested spatial metrics using PySpark into Delta Lake format, and automates CDC (Change Data Capture) analytics loading into Snowflake using Storage Integration, Streams, and Tasks.
+A multi-cloud data engineering pipeline that ingests, cleans, and analyzes live global flight telemetry using a **Medallion Architecture** pattern (Bronze $\rightarrow$ Silver $\rightarrow$ Gold) across Apache Airflow, AWS S3, Databricks PySpark, and Snowflake.
 
 ---
 
-## 🏗️ End-to-End Architecture
+## 🏗️ Medallion Architecture & Data Flow
 
 ```text
 ┌─────────────────────────┐
 │   OpenSky Network API   │  (Live Global Aircraft Telemetry)
 └────────────┬────────────┘
-             │ (HTTP REST Ingestion)
+             │ (HTTP REST / Boto3 Streaming)
              ▼
 ┌─────────────────────────┐
-│   Apache Airflow DAG    │  --> (multicloud_flight_ingestion_boto3)
+│     BRONZE LAYER        │  AWS S3 Raw Zone
+│ (Raw JSON Payloads)     │  s3://capstone1010/raw/
 └────────────┬────────────┘
-             │ (Raw JSON Stream via Boto3)
+             │ (s3a Protocol / Array Explode & Schema Normalization)
              ▼
 ┌─────────────────────────┐
-│    AWS S3 Raw Zone      │  --> (s3://capstone1010/raw/)
+│     SILVER LAYER        │  Databricks PySpark & Delta Lake
+│ (Cleaned & Structured)  │  s3://capstone1010/processed/flight_delta_table/
 └────────────┬────────────┘
-             │ (s3a Protocol / PySpark Processing)
+             │ (AWS IAM Storage Integration / COPY INTO & Streams)
              ▼
 ┌─────────────────────────┐
-│   PySpark Data Engine   │  --> (Unnest Matrix Array, Schema Casting & Delta Write)
-└────────────┬────────────┘
-             │ (Parquet / Delta Format)
-             ▼
-┌─────────────────────────┐
-│  AWS S3 Processed Zone  │  --> (s3://capstone1010/processed/flight_delta_table/)
-└────────────┬────────────┘
-             │ (AWS IAM Role-Based Storage Integration)
-             ▼
-┌─────────────────────────┐
-│  Snowflake Landing Zone │  --> (FLIGHT_RAW_LANDING Table via COPY INTO)
-└────────────┬────────────┘
-             │ (Stream CDC Trigger & QUALIFY Deduplication)
-             ▼
-┌─────────────────────────┐
-│ Snowflake Target Zone   │  --> (FLIGHT_ANALYTICS_TARGET - Real-Time Merge Table)
+│      GOLD LAYER         │  Snowflake Analytics & CDC Target
+│ (Deduplicated CDC Sink) │  FLIGHT_ANALYTICS_TARGET (Real-Time Upsert Sink)
 └─────────────────────────┘
 
 ## 🛠️ Tech Stack
 
-* **Orchestration & Raw Ingestion:** OpenSky Network API ➔ Apache Airflow ➔ AWS S3 (Raw JSON)
-* **Processing Engine:** PySpark ➔ AWS S3 (Delta Lake Storage)
-* **Warehouse & CDC Engine:** Snowflake (Storage Integration ➔ Streams & Tasks)
+* **Ingestion & Orchestration:** Apache Airflow (PyCharm / Boto3) ➔ AWS S3 (Raw JSON)
+* **Processing Engine:** Databricks PySpark ➔ AWS S3 (Delta Lake Storage)
+* **Warehouse & CDC Analytics:** Snowflake (Storage Integration ➔ Streams & Tasks)
+
+---
