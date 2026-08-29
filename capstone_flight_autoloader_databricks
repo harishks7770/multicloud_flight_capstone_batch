@@ -1,12 +1,14 @@
+from pyspark.sql import functions as F
+
 # 1. CONFIGURE STORAGE VARIABLES
-AWS_ACCESS_KEY = "<yout_access_key>"
+AWS_ACCESS_KEY = "<your_access_key>"
 AWS_SECRET_KEY = "<your_secret_key>"
 BUCKET_NAME = "<your_bucket_name>"
 
 # Path using the modern s3a protocol for cluster storage 
 s3_raw_path = f"<your_s3_raw_file_path>"
 
---------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
 
 # 2. READ MULTILINE JSON RAW PAYLOADS FROM S3
 df_raw = (spark.read
@@ -18,12 +20,9 @@ df_raw = (spark.read
 print("Raw data read successfully. Data structure lookahead:")
 df_raw.printSchema()
 
-----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 
 # 3. UNPACK THE NESTED ARRAY
-# We break 'states' out into distinct flight rows
-  
-from pyspark.sql import functions as F
 df_exploded = df_raw.select(
     F.col("time").alias("api_fetch_timestamp"), 
     F.explode("states").alias("flight")
@@ -45,17 +44,17 @@ df_transformed = df_exploded.select(
 # Render a live scannable table view directly in the notebook 
 display(df_transformed.limit(10))
 
----------------------------------------------------------------------------------------
-# 4. WRITE THE CLEAN DATA LAYER TO S3
+# ---------------------------------------------------------------------------------------
+
+# 4. WRITE TO DELTA TABLE WITH SCHEMA EVOLUTION
 s3_output_path = f"s3a://capstone1010/processed/flight_delta_table"
 
 (df_transformed.write
  .format("delta")
  .mode("append")
- .option("fs.s3a.access.key",AWS_ACCESS_KEY )
- .option("fs.s3a.secret.key",AWS_SECRET_KEY)
+ .option("mergeSchema", "true")  # Enables Delta schema evolution
+ .option("fs.s3a.access.key", AWS_ACCESS_KEY)
+ .option("fs.s3a.secret.key", AWS_SECRET_KEY)
  .save(s3_output_path))
 
-print("🎉 Transformation Complete! Structured Delta table saved directly back to S3.")
-
-  
+print("🎉 Transformation Complete! Structured Delta table saved with Schema Evolution enabled.")
